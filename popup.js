@@ -12,13 +12,47 @@ const el = id => document.getElementById(id);
 let tabId = null;
 let reloadingUntil = 0;
 
-const NAMES = [['mp4a', 'AAC'], ['opus', 'Opus'], ['av01', 'AV1'], ['vp09', 'VP9'], ['vp9', 'VP9'], ['avc1', 'H.264'], ['avc3', 'H.264'], ['flac', 'FLAC'], ['alac', 'ALAC']];
-function codecName(mime) {
-  if (!mime) return '';
-  const match = /codecs\s*=\s*"?([^";]+)/i.exec(mime);
-  const id = (match ? match[1] : mime).split(',')[0].trim().toLowerCase();
-  const hit = NAMES.find(([prefix]) => id.startsWith(prefix));
-  return hit ? hit[1] : id;
+// The codec menus list what the page found: codecs the site offered first,
+// then the others this browser plays. Rebuilt only when that list changes.
+function fillPicker(select, list, chosen) {
+  const key = JSON.stringify([list, chosen]);
+  if (select.dataset.key === key) return;
+  select.dataset.key = key;
+  select.textContent = '';
+  select.append(new Option('Auto', 'auto'));
+  const group = (label, items, disabled) => {
+    if (!items.length) return;
+    const box = document.createElement('optgroup');
+    box.label = label;
+    for (const c of items) {
+      const option = new Option(c.name, c.id);
+      option.disabled = !!disabled;
+      box.append(option);
+    }
+    select.append(box);
+  };
+  group('Offered by this site', list.filter(c => c.site && c.browser));
+  group('This browser also plays', list.filter(c => !c.site && c.browser));
+  group("Offered, but this browser can't play", list.filter(c => c.site && !c.browser), true);
+  if (chosen !== 'auto' && !list.some(c => c.id === chosen)) select.append(new Option(chosen.toUpperCase() + ' (not found)', chosen));
+  select.value = chosen;
+}
+
+// "FLAC · 24-bit · 96 kHz · 2116 kbps"
+const audioLine = s => [s.audioName, s.audioBits ? s.audioBits + '-bit' : '',
+  s.audioRate ? s.audioRate / 1000 + ' kHz' : '', s.audioKbps ? s.audioKbps + ' kbps' : ''].filter(Boolean).join(' · ');
+
+// One sentence about a forced codec, or '' when there is nothing to say.
+function forcedNote(kind, chosen, status) {
+  if (chosen === 'auto') return '';
+  const list = (status.choices && status.choices[kind]) || [];
+  const found = list.find(c => c.id === chosen);
+  const name = found ? found.name : chosen.toUpperCase();
+  const now = kind === 'audio' ? status.audioId : status.videoId;
+  if (found && !found.browser) return "This browser can't play " + name + ', so ' + kind + ' stays on Auto.';
+  if (now === chosen) return '';
+  if (!found || !found.site) return 'This site hasn\'t offered ' + name + ' yet. If nothing plays, set ' + kind + ' back to Auto.';
+  return now ? 'Reload the tab to switch ' + kind + ' to ' + name + '.' : '';
 }
 
 async function ask(message) {
@@ -32,8 +66,6 @@ function show() {
   el('modeNote').textContent = settings.unity
     ? 'Full digital level, normalization bypassed, speed 1x. Set your level on your amp or DAC.'
     : 'Playing as the site delivers it.';
-  el('audioCodec').value = settings.audioCodec;
-  el('videoCodec').value = settings.videoCodec;
 }
 
 async function save(reload) {
@@ -58,18 +90,21 @@ function render(reply) {
   const line = el('playing');
   let status = null;
   try { status = reply && JSON.parse(reply.status); } catch (_) { /* below */ }
-  line.className = '';
+  line.classList.remove('bad');
   if (!status) {
     line.textContent = Date.now() < reloadingUntil ? 'Reloading the tab...' : 'Reload this tab, then try again.';
-    if (Date.now() >= reloadingUntil) line.className = 'bad';
+    if (Date.now() >= reloadingUntil) line.classList.add('bad');
     return;
   }
-  const depth = [status.audioBits ? status.audioBits + '-bit' : '', status.audioRate ? status.audioRate / 1000 + ' kHz' : ''].filter(Boolean).join(' ');
-  const audio = [codecName(status.audio), depth].filter(Boolean).join(' ');
-  const video = codecName(status.video);
-  line.textContent = audio || video
-    ? 'Playing: ' + [audio, video].filter(Boolean).join(' · ')
+  fillPicker(el('audioCodec'), (status.choices && status.choices.audio) || [], settings.audioCodec);
+  fillPicker(el('videoCodec'), (status.choices && status.choices.video) || [], settings.videoCodec);
+  const audio = audioLine(status);
+  line.textContent = audio || status.videoName
+    ? [audio && 'Audio: ' + audio, status.videoName && 'Video: ' + status.videoName].filter(Boolean).join('\n')
     : 'Play something to see its codec.';
+  const note = [forcedNote('audio', settings.audioCodec, status), forcedNote('video', settings.videoCodec, status)].filter(Boolean).join(' ');
+  el('codecNote').textContent = note;
+  el('codecNote').hidden = !note;
 }
 
 (async () => {
