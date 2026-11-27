@@ -11,7 +11,6 @@ const settings = { ...DEFAULTS };
 const el = id => document.getElementById(id);
 let tabId = null;
 let reloadingUntil = 0;
-let site = '';
 
 const NAMES = [['mp4a', 'AAC'], ['opus', 'Opus'], ['av01', 'AV1'], ['vp09', 'VP9'], ['vp9', 'VP9'], ['avc1', 'H.264'], ['avc3', 'H.264']];
 function codecName(mime) {
@@ -41,7 +40,7 @@ async function save(reload) {
   show();
   try { await api.storage.local.set(settings); } catch (_) { /* keep going */ }
   const reply = await ask({ type: 'yta-apply', settings });
-  if (reply && reload && site === 'youtube') {
+  if (reply && reload) {
     // Players pick their formats when the page loads, so load it again.
     reloadingUntil = Date.now() + 5000;
     try { await api.tabs.reload(tabId); } catch (_) { /* keep going */ }
@@ -65,7 +64,6 @@ function render(reply) {
     if (Date.now() >= reloadingUntil) line.className = 'bad';
     return;
   }
-  site = status.site || '';
   const audio = codecName(status.audio);
   const video = codecName(status.video);
   line.textContent = audio || video

@@ -83,7 +83,7 @@
   }
 
   function refused(mime) {
-    if (SITE !== 'youtube' || typeof mime !== 'string') return false;
+    if (typeof mime !== 'string') return false;
     const low = mime.toLowerCase();
     const kind = low.startsWith('audio/') ? 'audio' : low.startsWith('video/') ? 'video' : '';
     const keep = kind && settings[kind];
