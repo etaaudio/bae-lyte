@@ -1,130 +1,50 @@
 # BAE Lyte
 
-The lite edition of BAE: an **Off / Purist** switch and the **codec pickers**, nothing else.
-No speed control, padded bits, crossfeed, B-Mode, clip guard, output picker or on-player readout.
-A lite fork of [etaaudio/bae](https://github.com/etaaudio/bae), the full extension; the notes below describe BAE.
+The lite edition of [BAE](https://github.com/etaaudio/bae) (B-audio Enhancer). Two things, nothing else:
 
-# BAE
+- **Off / Purist.** Purist plays every video and track at full digital level, so the site's
+  loudness normalization can't turn it down. Set your listening level on your amp or DAC.
+  Off leaves the page exactly as the site delivers it.
+- **Codec choice.** Pick the audio codec (AAC or Opus) and video codec (H.264, VP9 or AV1)
+  where the player offers them. The popup shows what is actually playing.
 
-B-audio Enhancer. A browser extension for people who care how YouTube and Spotify's web player sound.
-One folder runs in Safari, Chrome and Firefox. Version 3.2.
-
-## What it does
-
-| Feature | YouTube | Spotify web player |
-| --- | --- | --- |
-| Purist: 0 dB, nothing processed | Yes | Yes |
-| Bypass YouTube's volume normalization | Yes | Not applicable |
-| Choose audio codec (Auto, AAC, Opus) | Yes | Not applicable, AAC only |
-| Choose video codec (Auto, H.264, VP9, AV1) | Yes | Not applicable |
-| Codec readout | Yes | Yes |
-| Speed 0.25x to 3x, with or without pitch correction | Yes | Yes |
-| Audio output device picker | Where the browser allows | Where the browser allows |
-| Padded bits: gain above 0 dB, up to +20 dB (experimental) | Yes | Untested |
-| Crossfeed for headphones (experimental) | Yes | Untested |
-| B-Mode: bass shelf, +12 dB at 10, 20 or 40 Hz (experimental) | Yes | Untested |
-| Clip guard: a peak limiter, or a plain cap on the gain, after padded bits and B-Mode (experimental) | Yes | Untested |
-| Audio path: Tap, Stream capture or Rebuild, for browsers that don't pass audio to extensions (experimental) | Yes, AAC | Untested |
-| Buffer readout, and a toolbar icon that turns green for Purist and blue while an effect is on | Yes | Yes |
-
-### Purist
-
-One switch that supersedes everything that alters the sound: full digital level with the
-player's volume slider ignored, normalization bypassed, speed at 1x, pitch untouched, no
-added gain, no crossfeed and no bass lift. Set the listening volume on your amp or DAC.
-
-### Speed without the popup
-
-| Action | Result |
-| --- | --- |
-| Option (Alt) + scroll over the video | Faster or slower, 0.05x per notch |
-| Option (Alt) + Up / Down | Faster / slower |
-| Option (Alt) + 0 | Back to 1x |
-
-### Warnings
-
-- **Padded bits will clip with clip guard off.** With it on, peaks are held under full
-  scale by a limiter, which is audible when it works hard. Either way, gain above 0 dB
-  can damage speakers, headphones and hearing.
-  It is never saved and returns to 0 dB on every page load.
-- **Purist plays at full level.** Turn your amp or DAC down before switching it on.
-- **B-Mode lowers the overall level by 12 dB** so the bass lift has room below full
-  scale. Turn your amp up to compensate, and back down before switching it off.
-- **In Safari the experimental audio features have no effect on YouTube or Spotify.**
-  Safari plays streamed video itself and passes no audio to the Web Audio engine (WebKit
-  bugs 266922 and 256445), so padded bits, crossfeed, B-Mode and clip guard cannot change
-  the sound there on the standard audio path. BAE detects this and says so. An
-  experimental alternative, Audio path: Rebuild, reads and decodes YouTube's AAC audio
-  itself and plays it in step with the picture; it is untested. Everything else works in
-  Safari.
-- Padded bits, crossfeed and B-Mode route audio through the browser's audio engine, which may
-  resample it. Reload the tab to return to the untouched path.
+About 400 lines of plain JavaScript, no dependencies, no build step, no network requests,
+and only the `storage` permission.
 
 ## Install
 
-Allow the extension on each site you use it with.
+Download the package for your browser from [Releases](https://github.com/etaaudio/bae-lyte/releases):
+`lyte-chrome.zip`, `lyte-firefox.zip` or `lyte-safari.zip` (a Mac app; until it is signed,
+turn on Safari's Develop > Allow Unsigned Extensions).
 
-### Safari (18.4 or later)
-
-Temporary: Settings > Developer > Add Temporary Extension, pick this folder, then on the
-site click the toolbar button, choose "Always Allow on This Website", and reload.
-
-Permanent: `xcrun safari-web-extension-packager /path/to/this/folder`, then Run in Xcode
-with your Apple ID as the signing team.
-
-### Chrome, Edge, Brave (111 or later)
-
-`chrome://extensions` > turn on Developer mode > Load unpacked > pick this folder.
-Chrome shows a harmless warning about `browser_specific_settings`.
-
-### Firefox (128 or later)
-
-`about:debugging` > This Firefox > Load Temporary Add-on > pick `manifest.json`.
-Removed when Firefox quits; a permanent install needs signing at addons.mozilla.org.
+To run from source: Chrome `chrome://extensions` > Developer mode > Load unpacked > this folder.
+Firefox `about:debugging` > Load Temporary Add-on > `manifest.json`. Safari Develop > Add
+Temporary Extension > this folder.
 
 ## How it works
 
-| File | Runs in | Job |
-| --- | --- | --- |
-| `manifest.json` | n/a | Declares the scripts, the popup and the sites |
-| `page.js` | The page's own JavaScript world | Steers codec choice, manages volume, speed, output and the audio engine |
-| `background.js` | The extension's background | Colours the toolbar icon: green for Purist, blue while something changes the sound |
-| `bridge.js` | The extension's isolated world | Passes settings to `page.js` and answers the popup |
-| `popup.html`, `popup.js` | The toolbar popup | The controls and readouts |
+`page.js` runs in the page before the site's code. For codec choice it answers "unplayable"
+for the formats you didn't pick when the player asks what the browser supports; it never
+forces a format the browser can't play. For Purist it intercepts writes to a media element's
+`volume`: the site's value is remembered and reported back, while the element plays at 1.
+Mute and fades to silence are always honoured. `bridge.js` passes your saved settings to
+`page.js` and answers the popup.
 
-The extension collects no data and makes no network requests. It has no dependencies.
+## Releasing
 
-## Status
-
-Tested in simulation; real-browser testing is in progress. Expect rough edges,
-especially on Spotify and in the experimental section.
+Set `"version"` in `manifest.json`, commit, then `git tag v1.1 && git push && git push origin v1.1`.
+GitHub builds the three packages and attaches them to a Release.
 
 ## Credits
 
-Created by Thomas Lucio at ETA Audio LLC.
-
-All code in this repository was written for this project. It contains no third-party code.
-The following work informed the design:
-
-- **abec2304**, whose "No YouTube Volume Normalization" userscripts showed that YouTube
-  applies loudness normalization through the media element's volume. The idea of
-  undoing it there comes from that work. No code from those scripts is used.
-- **Crossfeed designs** by Benjamin Bauer (stereophonic-to-binaural network), Chu Moy
-  and Jan Meier, and Boris Mikhaylov's bs2b library, which documents their cutoff and
-  feed levels. The Light, Medium and Strong settings follow those published levels.
-- **B-Mode** is a gentle first-order bass shelf of the kind found on high-end headphone
-  amplifiers: a lift reaching 12 dB at 10, 20 or 40 Hz.
-- Developed with the assistance of Claude, by Anthropic.
+Created by Thomas Lucio at ETA Audio LLC. All code was written for this project.
+The idea of undoing loudness normalization at the media element's volume comes from
+abec2304's "No YouTube Volume Normalization" userscripts; none of their code is used.
+Developed with the assistance of Claude, by Anthropic.
 
 YouTube and Spotify are trademarks of their respective owners. This project is not
 affiliated with or endorsed by either.
 
 ## License
 
-Copyright (C) 2026 ETA Audio LLC.
-
-This project is licensed under the Mozilla Public License 2.0. You may use, modify and
-distribute it, including as part of a larger work under other terms, provided that the
-files covered by this license, and any changes you make to them, remain available under
-the MPL. See the [LICENSE](LICENSE) file for the full text, or
-https://mozilla.org/MPL/2.0/.
+Copyright (C) 2026 ETA Audio LLC. Mozilla Public License 2.0; see [LICENSE](LICENSE).

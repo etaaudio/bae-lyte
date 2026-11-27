@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "BAE Lyte",
-  "version": "1.0",
-  "description": "B-audio Enhancer, lite: Purist mode and codec choice for web media players. Nothing else.",
+  "version": "1.1",
+  "description": "B-audio Enhancer, lite: Purist mode and codec choice for web media players.",
   "permissions": [
     "storage"
   ],
