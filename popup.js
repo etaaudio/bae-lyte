@@ -61,7 +61,7 @@ function render(reply) {
   try { status = reply && JSON.parse(reply.status); } catch (_) { /* below */ }
   line.className = '';
   if (!status) {
-    line.textContent = Date.now() < reloadingUntil ? 'Reloading the tab...' : 'Open a supported media site in this tab, then reload it.';
+    line.textContent = Date.now() < reloadingUntil ? 'Reloading the tab...' : 'Reload this tab, then try again.';
     if (Date.now() >= reloadingUntil) line.className = 'bad';
     return;
   }
