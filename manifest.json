@@ -1,15 +1,14 @@
 {
   "manifest_version": 3,
   "name": "BAE Lyte",
-  "version": "1.1",
+  "version": "1.2",
   "description": "B-audio Enhancer, lite: Purist mode and codec choice for web media players.",
   "permissions": [
     "storage"
   ],
   "host_permissions": [
-    "https://*.youtube.com/*",
-    "https://*.youtube-nocookie.com/*",
-    "https://open.spotify.com/*"
+    "http://*/*",
+    "https://*/*"
   ],
   "action": {
     "default_title": "BAE Lyte",
@@ -29,9 +28,8 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*.youtube.com/*",
-        "https://*.youtube-nocookie.com/*",
-        "https://open.spotify.com/*"
+        "http://*/*",
+        "https://*/*"
       ],
       "js": [
         "page.js"
@@ -42,9 +40,8 @@
     },
     {
       "matches": [
-        "https://*.youtube.com/*",
-        "https://*.youtube-nocookie.com/*",
-        "https://open.spotify.com/*"
+        "http://*/*",
+        "https://*/*"
       ],
       "js": [
         "bridge.js"

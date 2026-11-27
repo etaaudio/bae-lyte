@@ -19,11 +19,11 @@
     if (root && root.getAttribute('data-' + name) !== value) root.setAttribute('data-' + name, value);
     try { localStorage.setItem(name, value); } catch (_) { /* storage blocked in this frame */ }
   };
-  const pick = (value, allowed) => (allowed.includes(value) ? value : 'auto');
+  const pick = value => (typeof value === 'string' && /^[a-z0-9.-]{1,16}$/.test(value) ? value : 'auto');
   const push = s => {
     publish('yta-unity', s.unity ? '1' : '0');
-    publish('yta-audio', pick(s.audioCodec, ['aac', 'opus']));
-    publish('yta-video', pick(s.videoCodec, ['h264', 'vp9', 'av1']));
+    publish('yta-audio', pick(s.audioCodec));
+    publish('yta-video', pick(s.videoCodec));
     document.dispatchEvent(new Event('yta-settings'));
   };
 

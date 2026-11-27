@@ -20,22 +20,25 @@
   select { font:inherit; }
   p { margin:10px 0 0; color:var(--soft); }
   p.bad { color:var(--alarm); }
+  p.now { margin:0 0 12px; color:var(--ink); font-weight:600; white-space:pre-line; }
+  select { max-width:150px; }
 </style>
 </head>
 <body>
   <h1>BAE Lyte</h1>
+  <p id="playing" class="now"></p>
   <div class="mode" role="group" aria-label="Mode">
     <button id="off" aria-pressed="true">Off</button>
     <button id="purist" aria-pressed="false">Purist</button>
   </div>
   <p id="modeNote"></p>
   <label>Audio codec
-    <select id="audioCodec"><option value="auto">Auto</option><option value="aac">AAC</option><option value="opus">Opus</option></select>
+    <select id="audioCodec"><option value="auto">Auto</option></select>
   </label>
   <label>Video codec
-    <select id="videoCodec"><option value="auto">Auto</option><option value="h264">H.264</option><option value="vp9">VP9</option><option value="av1">AV1</option></select>
+    <select id="videoCodec"><option value="auto">Auto</option></select>
   </label>
-  <p id="playing"></p>
+  <p id="codecNote" class="bad" hidden></p>
   <script src="popup.js"></script>
 </body>
 </html>

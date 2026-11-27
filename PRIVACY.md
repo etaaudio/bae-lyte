@@ -23,16 +23,10 @@ code.
 
 ## Sites it runs on
 
-BAE runs only on the few media sites named in its permissions, which your browser shows
-before you install it. On those pages it reads which audio and video formats the player
-uses and adjusts its volume, speed, audio processing and output device. It does not read
+BAE Lyte runs on every website, so Purist works in any tab that plays audio or video. On
+each page it reads which audio and video formats the player uses and holds its volume at
+full level. It does not read
 any other page content.
-
-## Microphone prompt
-
-If you use "Show my output devices", your browser asks for microphone access on that
-site, because browsers only list audio outputs for sites allowed to use the microphone.
-BAE switches the microphone off again immediately and never records or listens.
 
 ## Contact
 
