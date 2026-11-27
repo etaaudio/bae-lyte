@@ -121,6 +121,52 @@
     });
   }
 
+  // Sample rate and bit depth, read from the MP4 header segment the player
+  // hands the browser. Lossy codecs (AAC, Opus) have no bit depth; FLAC and
+  // ALAC carry the real one.
+  // ponytail: MP4 only; WebM streams and plain <audio src> files show no format.
+  const format = { rate: 0, bits: 0 };
+  const AUDIO_ENTRY = /^(mp4a|fLaC|alac|Opus|ec-3|ac-3|enca)$/;
+  const tag = (b, i) => String.fromCharCode(b[i], b[i + 1], b[i + 2], b[i + 3]);
+  const u32 = (b, i) => ((b[i] << 24) >>> 0) + (b[i + 1] << 16) + (b[i + 2] << 8) + b[i + 3];
+  const find = (b, name, from, to) => {
+    for (let i = from; i + 4 <= to; i++) if (b[i] === name.charCodeAt(0) && tag(b, i) === name) return i;
+    return -1;
+  };
+  function readFormat(data) {
+    const b = data instanceof ArrayBuffer ? new Uint8Array(data)
+      : ArrayBuffer.isView(data) ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength) : null;
+    if (!b || b.length < 8 || !/^(ftyp|moov)$/.test(tag(b, 4))) return; // header segments only
+    const end = Math.min(b.length, 65536);
+    const s = find(b, 'stsd', 0, end);
+    if (s < 0 || s + 48 > end) return;
+    const e = s + 12; // the first sample entry
+    if (!AUDIO_ENTRY.test(tag(b, e + 4))) return;
+    const stop = Math.min(end, e + u32(b, e));
+    let rate = u32(b, e + 32) >>> 16;
+    let bits = 0;
+    const flac = find(b, 'dfLa', e + 36, stop);
+    const alac = find(b, 'alac', e + 36, stop);
+    if (flac > 0 && flac + 26 <= stop) { // STREAMINFO starts 12 bytes in
+      const x = flac + 12;
+      rate = (b[x + 10] << 12) | (b[x + 11] << 4) | (b[x + 12] >> 4);
+      bits = (((b[x + 12] & 1) << 4) | (b[x + 13] >> 4)) + 1;
+    } else if (alac > 0 && alac + 32 <= stop) {
+      bits = b[alac + 13];
+      rate = u32(b, alac + 28);
+    }
+    format.rate = rate;
+    format.bits = bits;
+  }
+  for (const Class of [window.SourceBuffer, window.ManagedSourceBuffer]) {
+    const proto = Class && Class.prototype;
+    if (!proto || !Object.prototype.hasOwnProperty.call(proto, 'appendBuffer')) continue;
+    wrap(proto, 'appendBuffer', original => function (data) {
+      try { readFormat(data); } catch (_) { /* never get in the player's way */ }
+      return original.apply(this, arguments);
+    });
+  }
+
   /* ------------------- Purist: full digital level, always ------------------- */
 
   // The site writes (slider level x loudness factor) into the media element's
@@ -191,7 +237,8 @@
     if (!el) return;
     el.setAttribute('data-yta-page', '1');
     el.setAttribute('data-yta-status', JSON.stringify({
-      site: SITE, unity: settings.unity, canPatch: patchable, audio: opened.audio, video: opened.video
+      site: SITE, unity: settings.unity, canPatch: patchable, audio: opened.audio, video: opened.video,
+      audioRate: format.rate, audioBits: format.bits
     }));
   });
 })();

@@ -12,7 +12,7 @@ const el = id => document.getElementById(id);
 let tabId = null;
 let reloadingUntil = 0;
 
-const NAMES = [['mp4a', 'AAC'], ['opus', 'Opus'], ['av01', 'AV1'], ['vp09', 'VP9'], ['vp9', 'VP9'], ['avc1', 'H.264'], ['avc3', 'H.264']];
+const NAMES = [['mp4a', 'AAC'], ['opus', 'Opus'], ['av01', 'AV1'], ['vp09', 'VP9'], ['vp9', 'VP9'], ['avc1', 'H.264'], ['avc3', 'H.264'], ['flac', 'FLAC'], ['alac', 'ALAC']];
 function codecName(mime) {
   if (!mime) return '';
   const match = /codecs\s*=\s*"?([^";]+)/i.exec(mime);
@@ -64,7 +64,8 @@ function render(reply) {
     if (Date.now() >= reloadingUntil) line.className = 'bad';
     return;
   }
-  const audio = codecName(status.audio);
+  const depth = [status.audioBits ? status.audioBits + '-bit' : '', status.audioRate ? status.audioRate / 1000 + ' kHz' : ''].filter(Boolean).join(' ');
+  const audio = [codecName(status.audio), depth].filter(Boolean).join(' ');
   const video = codecName(status.video);
   line.textContent = audio || video
     ? 'Playing: ' + [audio, video].filter(Boolean).join(' · ')
