@@ -11,30 +11,46 @@ const settings = { ...DEFAULTS };
 const el = id => document.getElementById(id);
 let tabId = null;
 let reloadingUntil = 0;
+let lastChoices = { audio: [], video: [] }; // what the page last reported
 
-// The codec menus list what the page found: codecs the site offered first,
-// then the others this browser plays. Rebuilt only when that list changes.
-function fillPicker(select, list, chosen) {
-  const key = JSON.stringify([list, chosen]);
+// Every codec the menus know, with a type to ask this browser about. The
+// popup asks the browser itself, so the menus are full even before the page
+// has reported anything.
+const MENU = {
+  audio: [['aac', 'AAC', 'audio/mp4; codecs="mp4a.40.2"'], ['mp3', 'MP3', 'audio/mpeg'], ['opus', 'Opus', 'audio/webm; codecs="opus"'],
+    ['vorbis', 'Vorbis', 'audio/webm; codecs="vorbis"'], ['flac', 'FLAC', 'audio/mp4; codecs="flac"'], ['alac', 'ALAC', 'audio/mp4; codecs="alac"'],
+    ['ac-3', 'Dolby Digital', 'audio/mp4; codecs="ac-3"'], ['ec-3', 'Dolby Digital Plus', 'audio/mp4; codecs="ec-3"'],
+    ['ac-4', 'Dolby AC-4', 'audio/mp4; codecs="ac-4.02.01.01"'], ['pcm', 'PCM', 'audio/wav']],
+  video: [['h264', 'H.264', 'video/mp4; codecs="avc1.640028"'], ['hevc', 'HEVC', 'video/mp4; codecs="hvc1.1.6.L120.90"'],
+    ['dovi', 'Dolby Vision', 'video/mp4; codecs="dvh1.05.06"'], ['vp8', 'VP8', 'video/webm; codecs="vp8"'],
+    ['vp9', 'VP9', 'video/webm; codecs="vp09.00.40.08"'], ['av1', 'AV1', 'video/mp4; codecs="av01.0.08M.08"']]
+};
+const probe = document.createElement('video');
+function canPlay(type) {
+  try { return (globalThis.MediaSource && MediaSource.isTypeSupported(type)) || probe.canPlayType(type) !== ''; } catch (_) { return false; }
+}
+
+// The codec menus: codecs the site offered first, by name; then every other
+// codec this browser plays, as "(Force) name". Rebuilt only when that changes.
+function fillPicker(select, kind, choices, chosen) {
+  const offered = new Map((choices || []).filter(c => c.site).map(c => [c.id, c]));
+  const items = MENU[kind].map(([id, name, type]) => ({ id, name, site: offered.has(id),
+    ok: offered.has(id) ? offered.get(id).browser !== false : canPlay(type) })).filter(c => c.site || c.ok);
+  for (const c of offered.values()) {
+    if (!MENU[kind].some(m => m[0] === c.id)) items.push({ id: c.id, name: c.name, site: true, ok: c.browser !== false });
+  }
+  items.sort((a, b) => b.site - a.site);
+  if (chosen !== 'auto' && !items.some(c => c.id === chosen)) items.push({ id: chosen, name: chosen.toUpperCase(), site: false, ok: true });
+  const key = JSON.stringify([items, chosen]);
   if (select.dataset.key === key) return;
   select.dataset.key = key;
   select.textContent = '';
   select.append(new Option('Auto', 'auto'));
-  const group = (label, items, disabled) => {
-    if (!items.length) return;
-    const box = document.createElement('optgroup');
-    box.label = label;
-    for (const c of items) {
-      const option = new Option(c.name, c.id);
-      option.disabled = !!disabled;
-      box.append(option);
-    }
-    select.append(box);
-  };
-  group('Offered by this site', list.filter(c => c.site && c.browser));
-  group('This browser also plays', list.filter(c => !c.site && c.browser));
-  group("Offered, but this browser can't play", list.filter(c => c.site && !c.browser), true);
-  if (chosen !== 'auto' && !list.some(c => c.id === chosen)) select.append(new Option(chosen.toUpperCase() + ' (not found)', chosen));
+  for (const c of items) {
+    const option = new Option(!c.ok ? c.name + " (browser can't play)" : c.site ? c.name : '(Force) ' + c.name, c.id);
+    option.disabled = !c.ok;
+    select.append(option);
+  }
   select.value = chosen;
 }
 
@@ -66,6 +82,8 @@ function show() {
   el('modeNote').textContent = settings.unity
     ? 'Full digital level, normalization bypassed, speed 1x. Set your level on your amp or DAC.'
     : 'Playing as the site delivers it.';
+  fillPicker(el('audioCodec'), 'audio', lastChoices.audio, settings.audioCodec);
+  fillPicker(el('videoCodec'), 'video', lastChoices.video, settings.videoCodec);
 }
 
 async function save(reload) {
@@ -96,8 +114,9 @@ function render(reply) {
     if (Date.now() >= reloadingUntil) line.classList.add('bad');
     return;
   }
-  fillPicker(el('audioCodec'), (status.choices && status.choices.audio) || [], settings.audioCodec);
-  fillPicker(el('videoCodec'), (status.choices && status.choices.video) || [], settings.videoCodec);
+  if (status.choices) lastChoices = status.choices;
+  fillPicker(el('audioCodec'), 'audio', lastChoices.audio, settings.audioCodec);
+  fillPicker(el('videoCodec'), 'video', lastChoices.video, settings.videoCodec);
   const audio = audioLine(status);
   line.textContent = audio || status.videoName
     ? [audio && 'Audio: ' + audio, status.videoName && 'Video: ' + status.videoName].filter(Boolean).join('\n')
