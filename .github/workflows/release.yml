@@ -1,13 +1,12 @@
-# BAE Lyte. Every push to the lyte branch, and every PR into it, builds the Chrome, Firefox and
-# Safari packages as downloadable artifacts. Pushing a tag like lyte-v1.1 also checks it matches
-# the manifest and publishes them as a Release (BAE's own v* releases stay on main).
+# BAE Lyte. Every push to main, and every PR, builds the Chrome, Firefox and
+# Safari packages as downloadable artifacts. Pushing a tag like v1.1 also checks it matches
+# the manifest and publishes them as a Release.
 name: release
 on:
   push:
-    branches: [lyte]
-    tags: ['lyte-v*']
+    branches: [main]
+    tags: ['v*']
   pull_request:
-    branches: [lyte]
 permissions:
   contents: write
 jobs:
@@ -17,13 +16,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check tag matches manifest version
         if: startsWith(github.ref, 'refs/tags/')
-        run: test "lyte-v$(jq -r .version manifest.json)" = "$GITHUB_REF_NAME"
+        run: test "v$(jq -r .version manifest.json)" = "$GITHUB_REF_NAME"
       - run: ./build.sh
       - uses: actions/upload-artifact@v4
         with:
           name: lyte-packages
           path: dist/*.zip
       - if: startsWith(github.ref, 'refs/tags/')
-        run: gh release create "$GITHUB_REF_NAME" dist/*.zip --title "BAE Lyte $(jq -r .version manifest.json)" --generate-notes --latest=false
+        run: gh release create "$GITHUB_REF_NAME" dist/*.zip --title "BAE Lyte $(jq -r .version manifest.json)" --generate-notes
         env:
           GH_TOKEN: ${{ github.token }}

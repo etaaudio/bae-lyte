@@ -2,7 +2,7 @@
 
 The lite edition of BAE: an **Off / Purist** switch and the **codec pickers**, nothing else.
 No speed control, padded bits, crossfeed, B-Mode, clip guard, output picker or on-player readout.
-The full extension lives on the `main` branch; the notes below describe it.
+A lite fork of [etaaudio/bae](https://github.com/etaaudio/bae), the full extension; the notes below describe BAE.
 
 # BAE
 
