@@ -295,12 +295,63 @@
     }
   }
 
-  // A player that plays a plain file (no MediaSource) gets its file's first
-  // 64 KB fetched once, the same URL it is already playing, and the header
-  // read from that. If the site's server refuses, the file extension names
-  // the codec and there is no rate or bit depth.
+  // Fetch part of a URL the player is already using and read a header from it.
+  function readUrl(url, range, info, then) {
+    return fetch(url, { headers: { Range: range || 'bytes=0-65535' } }).then(r => {
+      if (!r.ok) return;
+      return r.arrayBuffer().then(data => then(data, r));
+    }).catch(() => { /* refused: say what is known without it */ });
+  }
+
+  // HLS (a .m3u8 playlist, which Safari plays itself). The playlist lists each
+  // version of the stream with its codecs and bit rate; the one playing is the
+  // one nearest the measured bit rate, and its header segment (EXT-X-MAP)
+  // gives the sample rate and bit depth.
+  const attrs = line => Object.fromEntries([...line.matchAll(/([A-Z0-9-]+)=("[^"]*"|[^,]*)/g)]
+    .map(m => [m[1], m[2].replace(/"/g, '')]));
+  const audioIdIn = codecs => (familiesOf('audio/mp4; codecs="' + codecs + '"').find(f => f.kind === 'audio') || {}).id || '';
+  function readPlaylist(text, base, info) {
+    const lines = text.split(/\r?\n/);
+    const renditions = lines.filter(l => l.startsWith('#EXT-X-MEDIA:')).map(attrs).filter(a => a.TYPE === 'AUDIO' && a.URI);
+    const variants = [];
+    lines.forEach((line, i) => {
+      if (!line.startsWith('#EXT-X-STREAM-INF:')) return;
+      const a = attrs(line);
+      const rendition = renditions.find(r => r['GROUP-ID'] === a.AUDIO);
+      try {
+        variants.push({ id: audioIdIn(a.CODECS || ''), bps: Number(a['AVERAGE-BANDWIDTH'] || a.BANDWIDTH) || 0,
+          uri: new URL(rendition ? rendition.URI : lines[i + 1], base).href });
+      } catch (_) { /* a line this can't read */ }
+    });
+    if (variants.length) {
+      info.variants = variants;
+      const ids = new Set(variants.map(v => v.id));
+      if (ids.size === 1) info.id = variants[0].id; // every version is the same codec
+      return;
+    }
+    const map = /#EXT-X-MAP:(.*)/.exec(text); // a media playlist: read its header segment
+    if (!map) return;
+    const a = attrs(map[1]);
+    const range = /^(\d+)(?:@(\d+))?$/.exec(a.BYTERANGE || '');
+    const from = range ? Number(range[2] || 0) : 0;
+    readUrl(new URL(a.URI, base).href, range ? 'bytes=' + from + '-' + (from + Number(range[1]) - 1) : '', info,
+      data => readFormat(data, info));
+  }
+  // Once the bit rate is measured, settle which version is playing.
+  function pickVariant(info, kbps) {
+    if (!info.variants || info.picked || !kbps) return;
+    const v = info.variants.reduce((a, b) => (Math.abs(b.bps / 1000 - kbps) < Math.abs(a.bps / 1000 - kbps) ? b : a));
+    info.picked = v;
+    if (v.id) info.id = v.id;
+    readUrl(v.uri, 'bytes=0-262143', info, data => readPlaylist(new TextDecoder().decode(data), v.uri, info));
+  }
+
+  // A player that plays a plain file or an HLS playlist (no MediaSource) gets
+  // the start of it fetched once, the same URL it is already playing, and the
+  // header read from that. If the site's server refuses, the file extension
+  // names the codec and there is no rate or bit depth.
   const EXT = { flac: 'flac', mp3: 'mp3', m4a: 'aac', mp4: 'aac', aac: 'aac', opus: 'opus', ogg: 'vorbis', wav: 'pcm' };
-  const files = new Map(); // src -> { id, rate, bits, total }
+  const files = new Map(); // src -> { id, rate, bits, total, variants, picked }
   function plainFile(media) {
     const src = media && media.currentSrc;
     if (!src || !/^https?:/.test(src)) return null;
@@ -309,12 +360,27 @@
     const ext = /\.([a-z0-9]{2,4})(?:[?#]|$)/i.exec(src.split('?')[0]);
     const info = { id: (ext && EXT[ext[1].toLowerCase()]) || '', rate: 0, bits: 0, total: 0 };
     files.set(src, info);
-    fetch(src, { headers: { Range: 'bytes=0-65535' } }).then(r => {
-      if (!r.ok) return;
-      info.total = Number((/\/(\d+)$/.exec(r.headers.get('content-range') || '') || [])[1]) || 0;
-      return r.arrayBuffer().then(data => readFormat(data, info));
-    }).catch(() => { /* refused: the extension is all there is */ });
+    readUrl(src, '', info, (data, r) => {
+      if (readFormat(data, info)) {
+        info.total = Number((/\/(\d+)$/.exec(r.headers.get('content-range') || '') || [])[1]) || 0;
+        return;
+      }
+      const text = new TextDecoder().decode(data);
+      if (text.startsWith('#EXTM3U')) readPlaylist(text, src, info);
+    });
     return info;
+  }
+
+  // Bit rate from the browser's own count of audio bytes decoded, for players
+  // whose segments this can't see. Averaged since this first looked.
+  const decoded = new WeakMap(); // media -> [bytes, playback seconds] at the first look
+  function decodedKbps(media) {
+    const bytes = media && media.webkitAudioDecodedByteCount;
+    if (!bytes) return 0;
+    const t = media.currentTime;
+    const first = decoded.get(media);
+    if (!first || t < first[1] || bytes < first[0]) { decoded.set(media, [bytes, t]); return 0; }
+    return t - first[1] > 2 ? (bytes - first[0]) * 8 / (t - first[1]) / 1000 : 0;
   }
 
   // Everything the popup shows about codecs, for the media element playing now.
@@ -329,12 +395,13 @@
         browser: plays[id] !== undefined ? plays[id] : offered[kind].get(id) === true
       })).sort((a, b) => b.site - a.site);
     };
+    const seconds = media && isFinite(media.duration) ? media.duration : 0;
+    const kbps = (file ? (file.total && seconds > 1 ? file.total * 8 / seconds / 1000 : 0)
+      : (audioStream.seconds > 1 ? audioStream.bytes * 8 / audioStream.seconds / 1000 : 0)) || decodedKbps(media);
+    if (file) pickVariant(file, kbps);
     const audioId = file ? file.id : idOf(opened.audio, 'audio');
     const videoId = idOf(opened.video, 'video');
     const from = file || audioStream;
-    const seconds = media && isFinite(media.duration) ? media.duration : 0;
-    const kbps = file ? (file.total && seconds > 1 ? file.total * 8 / seconds / 1000 : 0)
-      : (audioStream.seconds > 1 ? audioStream.bytes * 8 / audioStream.seconds / 1000 : 0);
     return {
       audio: opened.audio, video: opened.video, audioId, videoId,
       audioName: audioId ? familyName('audio', audioId) : '', videoName: videoId ? familyName('video', videoId) : '',
