@@ -215,6 +215,15 @@
       into.id = 'pcm';
       return true;
     }
+    { // MP3: skip an ID3 tag, then read the first frame header (MPEG-1 or 2 layer III)
+      let i = boxTag(b, 0).startsWith('ID3') && b.length > 10
+        ? 10 + ((b[6] & 127) << 21 | (b[7] & 127) << 14 | (b[8] & 127) << 7 | (b[9] & 127)) : 0;
+      if (i + 4 <= b.length && b[i] === 0xff && (b[i + 1] & 0xe6) === 0xe2) {
+        const rates = { 3: [44100, 48000, 32000], 2: [22050, 24000, 16000], 0: [11025, 12000, 8000] }[(b[i + 1] >> 3) & 3];
+        const rate = rates && rates[(b[i + 2] >> 2) & 3];
+        if (rate) { into.rate = rate; into.bits = 0; into.id = 'mp3'; return true; }
+      }
+    }
     if (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) { // WebM
       for (let i = 0; i < end - 12; i++) {
         if (b[i] !== 0xe1) continue; // the Audio element; its settings follow
@@ -399,11 +408,26 @@
     const kbps = (file ? (file.total && seconds > 1 ? file.total * 8 / seconds / 1000 : 0)
       : (audioStream.seconds > 1 ? audioStream.bytes * 8 / audioStream.seconds / 1000 : 0)) || decodedKbps(media);
     if (file) pickVariant(file, kbps);
-    const audioId = file ? file.id : idOf(opened.audio, 'audio');
+    // Where the format was read from, shown in the popup so a site this can't
+    // read is easy to spot: the stream's segments, an HLS playlist, a plain
+    // file, or nothing visible (a stream run from a worker or another frame).
+    const handle = media && media.srcObject && /MediaSourceHandle/.test(String(media.srcObject.constructor && media.srcObject.constructor.name));
+    const how = opened.audio ? 'stream' : file ? (file.variants || file.picked ? 'hls' : 'file')
+      : handle || (media && /^blob:/.test(media.currentSrc || '')) ? 'hidden' : '';
+    let audioId = file ? file.id : idOf(opened.audio, 'audio');
+    // Nothing readable: name the codec the player must be using if only one is
+    // possible (the one forced, or the only one it asked about and was told yes).
+    let likely = false;
+    if (!audioId && (how === 'hidden' || how === 'file' || how === 'hls')) {
+      const yes = [...offered.audio].filter(([, ok]) => ok).map(([id]) => id);
+      const forced = wanted('audio');
+      audioId = forced !== 'auto' && yes.includes(forced) ? forced : yes.length === 1 ? yes[0] : '';
+      likely = !!audioId;
+    }
     const videoId = idOf(opened.video, 'video');
     const from = file || audioStream;
     return {
-      audio: opened.audio, video: opened.video, audioId, videoId,
+      audio: opened.audio, video: opened.video, audioId, videoId, how, likely,
       audioName: audioId ? familyName('audio', audioId) : '', videoName: videoId ? familyName('video', videoId) : '',
       audioRate: from.rate,
       audioBits: /^(flac|alac|pcm)$/.test(audioId) ? from.bits : 0, // lossy codecs have no bit depth

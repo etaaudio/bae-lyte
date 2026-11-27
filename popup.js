@@ -54,8 +54,16 @@ function fillPicker(select, kind, choices, chosen) {
   select.value = chosen;
 }
 
+// Where the popup's figures came from, in one sentence.
+const SOURCE = {
+  stream: 'Read from the stream itself.',
+  hls: 'Read from the stream\'s playlist and header.',
+  file: 'Read from the audio file.',
+  hidden: 'This player streams out of the extension\'s sight: the bit rate is measured, the codec is a best guess.'
+};
+
 // "FLAC · 24-bit · 96 kHz · 2116 kbps"
-const audioLine = s => [s.audioName, s.audioBits ? s.audioBits + '-bit' : '',
+const audioLine = s => [s.audioName && s.audioName + (s.likely ? ' (likely)' : ''), s.audioBits ? s.audioBits + '-bit' : '',
   s.audioRate ? s.audioRate / 1000 + ' kHz' : '', s.audioKbps ? s.audioKbps + ' kbps' : ''].filter(Boolean).join(' · ');
 
 // One sentence about a forced codec, or '' when there is nothing to say.
@@ -124,6 +132,7 @@ function render(reply) {
   const note = [forcedNote('audio', settings.audioCodec, status), forcedNote('video', settings.videoCodec, status)].filter(Boolean).join(' ');
   el('codecNote').textContent = note;
   el('codecNote').hidden = !note;
+  el('source').textContent = SOURCE[status.how] || '';
 }
 
 (async () => {
