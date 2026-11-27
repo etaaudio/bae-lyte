@@ -16,16 +16,13 @@
   const action = api && (api.action || api.browserAction);
   if (!action || typeof action.setIcon !== 'function') return;
 
-  const WATCHED = { unity: false, trueVolume: true, crossfeed: 'off', beef: 'off' };
+  const WATCHED = { unity: false };
   const paths = name => (name === 'default'
     ? { 16: 'icons/icon-16.png', 32: 'icons/icon-32.png', 48: 'icons/icon-48.png' }
     : { 16: 'icons/state-' + name + '-16.png', 32: 'icons/state-' + name + '-32.png', 48: 'icons/state-' + name + '-48.png' });
 
   function stateOf(settings) {
-    if (settings.unity) return 'green';
-    const feed = ['light', 'medium', 'strong'].includes(settings.crossfeed);
-    const beef = ['10', '20', '40'].includes(String(settings.beef));
-    return settings.trueVolume || feed || beef ? 'blue' : 'default';
+    return settings.unity ? 'green' : 'default'; // purist-only build: nothing else changes the sound
   }
 
   function refresh() {

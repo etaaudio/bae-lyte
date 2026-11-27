@@ -10,7 +10,7 @@
   const api = globalThis.browser || globalThis.chrome;
   const DEFAULTS = {
     audioCodec: 'auto', videoCodec: 'auto',
-    trueVolume: true, showCodec: true, showAttenuation: true, showSpeed: true, showBuffer: false,
+    trueVolume: false, showCodec: false, showAttenuation: false, showSpeed: false, showBuffer: false,
     speed: 1, pitchCorrection: true, unity: false, crossfeed: 'off', beef: 'off', guardMode: 'limiter', audioPath: 'tap',
     outputId: '', outputLabel: ''
   };
@@ -25,6 +25,9 @@
     unity: 'yta-unity'
   };
   const isTop = window === window.top;
+  // ponytail: purist-only build. Only these three settings are honoured; everything else stays at
+  // its neutral default, whatever an older full build left in storage.
+  const lite = s => ({ ...DEFAULTS, unity: !!s.unity, audioCodec: s.audioCodec || 'auto', videoCodec: s.videoCodec || 'auto' });
 
   // Publish one value for page.js. Writing to the page and to localStorage is
   // not free, and most values are unchanged from one push to the next (a
@@ -125,7 +128,7 @@
 
 
   const load = () => api.storage.local.get(DEFAULTS).then(settings => {
-    current = { ...DEFAULTS, ...settings };
+    current = lite(settings);
     push(current);
   }, () => {});
   load();
@@ -167,7 +170,7 @@
       document.dispatchEvent(new Event('yta-settings'));
     }
     if (message.type === 'yta-apply') {
-      current = { ...DEFAULTS, ...current, ...(message.settings || {}) };
+      current = lite({ ...current, ...(message.settings || {}) });
       push(current);
     }
 

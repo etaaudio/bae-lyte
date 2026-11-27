@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "BAE",
-  "version": "3.2",
-  "description": "B-audio Enhancer. Purist playback, codec choice, speed and output control for web media players.",
+  "name": "BAE Lyte",
+  "version": "1.0",
+  "description": "B-audio Enhancer, lite: Purist mode and codec choice for web media players. Nothing else.",
   "permissions": [
     "storage"
   ],
@@ -12,7 +12,7 @@
     "https://open.spotify.com/*"
   ],
   "action": {
-    "default_title": "BAE",
+    "default_title": "BAE Lyte",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -65,7 +65,7 @@
   "minimum_chrome_version": "121",
   "browser_specific_settings": {
     "gecko": {
-      "id": "bae@local",
+      "id": "bae-lyte@local",
       "strict_min_version": "128.0",
       "data_collection_permissions": {
         "required": [

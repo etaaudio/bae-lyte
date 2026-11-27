@@ -1,3 +1,9 @@
+# BAE Lyte
+
+The lite edition of BAE: an **Off / Purist** switch and the **codec pickers**, nothing else.
+No speed control, padded bits, crossfeed, B-Mode, clip guard, output picker or on-player readout.
+The full extension lives on the `main` branch; the notes below describe it.
+
 # BAE
 
 B-audio Enhancer. A browser extension for people who care how YouTube and Spotify's web player sound.
